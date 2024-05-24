@@ -1,8 +1,10 @@
+import subprocess
+
 from setuptools import setup, find_packages
 
 setup(
     name="flowtasks",
-    version="0.1.0",
+    version=subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip(),
     packages=find_packages(),
     install_requires=[
     ],
