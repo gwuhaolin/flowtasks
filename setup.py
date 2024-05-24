@@ -5,11 +5,11 @@ setup(
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
-        # 依赖列表
     ],
     author="hal",
     description="Python多进程并发调度工作流",
-    url="",
+    long_description="Python多进程并发调度工作流",
+    url="https://github.com/gwuhaolin/flow_task",
     classifiers=[
     ],
 )
