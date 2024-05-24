@@ -9,7 +9,7 @@ setup(
     author="hal",
     description="Python多进程并发调度工作流",
     long_description="Python多进程并发调度工作流",
-    url="https://github.com/gwuhaolin/flow_task",
+    url="https://github.com/gwuhaolin/flowtasks",
     classifiers=[
     ],
 )
