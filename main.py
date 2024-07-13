@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.orm import sessionmaker, scoped_session
 
-from flow_tasks.utils import exe_func
+from flowtasks.utils import exe_func
 
 # 启动项目
 if __name__ == '__main__':
