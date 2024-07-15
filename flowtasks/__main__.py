@@ -16,7 +16,7 @@ from .utils import exe_func
 # 启动项目
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    config_path = Path(sys.argv[-1] if len(sys.argv) > 1 else './config.json').resolve()
+    config_path = Path(sys.argv[-1] if len(sys.argv) > 1 else './flowtasks.json').resolve()
     config = json.load(open(config_path, 'r'))
     tasks = config['tasks']
     project_name = config['id']
