@@ -1,5 +1,4 @@
 import importlib
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 
@@ -16,8 +15,7 @@ def exe_func(task, func_params, config_path):  # 给进程用的任务执行
     spec.loader.exec_module(module)
     # 获取模块中的函数引用
     task_func = getattr(module, task['id'])
-    with ProcessPoolExecutor(max_workers=1) as process_executor:
-        feature = process_executor.submit(task_func, func_params)
-        # 这步会等待异步任务执行完成
-        result, err = feature.result(timeout=task.get('timeout'))
-        return result, err.__str__()
+    try:
+        return task_func(func_params), None
+    except Exception as e:
+        return None, e.__str__()  #
