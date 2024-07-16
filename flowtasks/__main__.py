@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import sys
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from sqlalchemy import JSON
@@ -97,18 +97,10 @@ if __name__ == '__main__':
         return True
 
 
-    def run_next_task(row_dict, task):
-        task_name = task['id']
-        next_tasks = task_next.get(task_name, [])
-        if len(next_tasks) == 0:
-            # 执行task_name之后的下一个为空的
-            for t in tasks[tasks.index(task) + 1:]:
-                if check_task_can_run(t, row_dict):
-                    return thread_pool.get(t['id']).submit(run_task, t, row_dict)
-        else:
-            for next_task in next_tasks:
-                if check_task_can_run(next_task, row_dict):
-                    thread_pool.get(next_task['id']).submit(run_task, next_task, row_dict)
+    def run_next_task(row_dict):
+        for next_task in tasks:
+            if check_task_can_run(next_task, row_dict):
+                thread_pool.get(next_task['id']).submit(run_task, next_task, row_dict)
 
 
     # 运行一条工作流任务
@@ -116,10 +108,8 @@ if __name__ == '__main__':
         row_id = row_dict.get('id')
         task_name = task['id']
         logging.info('run_task:%s:%s', task_name, row_id)
-        with ProcessPoolExecutor(max_workers=1) as process_executor:
-            feature = process_executor.submit(exe_func, task, row_dict, config_path)
-            # 这步会等待异步任务执行完成
-            result, err = feature.result(timeout=task.get('timeout'))
+        # 这步会等待异步任务执行完成
+        result, err = exe_func(task, row_dict, config_path)
         row_id = row_dict.get('id')
         db = Session()
         if err is not None:
@@ -139,7 +129,7 @@ if __name__ == '__main__':
             logging.info('task_done:%s:%s', task_name, row_id)
         db.commit()
         db.close()
-        run_next_task(row_dict, task)
+        run_next_task(row_dict)
 
 
     # 启动一个工作流任务
@@ -192,7 +182,7 @@ if __name__ == '__main__':
             logging.info('seed_done:%s:%s', seed_name, len(ids))
             for row in rows:
                 row_dict = dict(zip(['id'], row))
-                run_next_task(row_dict, tasks[0])
+                run_next_task(row_dict)
 
 
     # 启动所有种子任务
