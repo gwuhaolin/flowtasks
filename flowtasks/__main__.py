@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import sys
+import threading
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 
@@ -22,7 +23,6 @@ if __name__ == '__main__':
     project_name = config['id']
     thread_pool = {}
     task_next = {}
-    task_dep = {}
     for task in tasks:
         if task.get('skip'):
             continue
@@ -30,13 +30,11 @@ if __name__ == '__main__':
         task_name = task['id']
         thread_pool[task_name] = ThreadPoolExecutor(
             max_workers=task.get('max_workers', config.get('max_workers', os.cpu_count())))
-        task_dep[task_name] = [next(filter(lambda x: x['id'] == n, tasks)) for n in task.get('deps', [])]
         for dep in task.get('deps', []):
             if dep not in task_next:
                 task_next[dep] = [task]
             elif task not in task_next[dep]:
                 task_next[dep].append(task)
-
     # 创建到数据库的连接引擎
     _engine = create_engine(config['db'],
                             pool_size=100,  # 连接池的大小
@@ -79,6 +77,9 @@ if __name__ == '__main__':
 
     init_db()
 
+    task_lock = {}
+    thread_lock = threading.Lock()
+
 
     def check_task_can_run(task, row_dict):
         if task.get('skip'):
@@ -89,17 +90,25 @@ if __name__ == '__main__':
             return False
 
         # 检查依赖字段是否都存在
-        deps = task_dep.get(task_name, [])
-        for dep in deps:
-            if row_dict.get(dep['id']) is None:
+        for dep_key in task.get('deps', []):
+            if row_dict.get(dep_key) is None:
                 return False  # 有依赖还没执行完，先退出下一个大循环再说
 
         return True
 
 
-    def run_next_task(row_dict):
-        for next_task in tasks:
+    def run_next_task(row_dict, task=None):
+        next_tasks = tasks
+        if task is not None:
+            next_tasks = task_next.get(task['id'], [])
+        for next_task in next_tasks:
             if check_task_can_run(next_task, row_dict):
+                lock_key = f'{next_task['id']}/{row_dict['id']}'
+                with thread_lock:
+                    # 如果任务已经存在就不再重复
+                    if lock_key in task_lock:
+                        continue
+                    task_lock[lock_key] = True
                 thread_pool.get(next_task['id']).submit(run_task, next_task, row_dict)
 
 
@@ -131,7 +140,7 @@ if __name__ == '__main__':
             logging.info('task_done:%s:%s', task_name, row_id)
         db.commit()
         db.close()
-        run_next_task(row_dict)
+        run_next_task(row_dict, task)
 
 
     # 启动一个工作流任务
@@ -181,10 +190,10 @@ if __name__ == '__main__':
             sql = text(
                 f'insert into {project_name} (id) values {','.join([f"('{id}')" for id in ids])} on conflict do nothing returning id')
             db = Session()
-            rows = db.execute(sql)
+            rows = db.execute(sql).fetchall()
             db.commit()
             db.close()
-            logging.info('seed_done:%s:%s', seed_name, len(ids))
+            logging.info('seed_done:%s:%s:%s', seed_name, len(rows), rows)
             for row in rows:
                 row_dict = dict(zip(['id'], row))
                 run_next_task(row_dict)
@@ -205,3 +214,5 @@ if __name__ == '__main__':
         for task in tasks:
             executor.submit(start_task, task)
         executor.shutdown(wait=True)
+        for pool in thread_pool.values():
+            pool.shutdown(wait=True)
