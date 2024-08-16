@@ -117,10 +117,14 @@ if __name__ == '__main__':
         row_id = row_dict.get('id')
         task_name = task['id']
         logging.info('run_task:%s:%s', task_name, row_id)
-        with ProcessPoolExecutor(max_workers=1) as process_executor:
-            feature = process_executor.submit(exe_func, task, row_dict, config_path)
-            # 这步会等待异步任务执行完成
-            result, err = feature.result(timeout=task.get('timeout'))
+        try:
+            with ProcessPoolExecutor(max_workers=1) as process_executor:
+                feature = process_executor.submit(exe_func, task, row_dict, config_path)
+                # 这步会等待异步任务执行完成
+                result, err = feature.result(timeout=task.get('timeout'))
+        except Exception as e:
+            logging.error('task_err:%s:%s', task_name, e)
+            return
         row_id = row_dict.get('id')
         db = Session()
         if err is not None:
@@ -180,10 +184,14 @@ if __name__ == '__main__':
     def run_seed(seed):
         seed_name = seed['id']
         logging.info('run_seed:%s', seed_name)
-        with ProcessPoolExecutor(max_workers=1) as process_executor:
-            feature = process_executor.submit(exe_func, seed, {}, config_path)
-            # 这步会等待异步任务执行完成
-            ids, err = feature.result(timeout=seed.get('timeout'))
+        try:
+            with ProcessPoolExecutor(max_workers=1) as process_executor:
+                feature = process_executor.submit(exe_func, seed, {}, config_path)
+                # 这步会等待异步任务执行完成
+                ids, err = feature.result(timeout=seed.get('timeout'))
+        except Exception as e:
+            logging.error('seed_err:%s:%s', seed_name, e)
+            return
         if err is not None:
             logging.error('seed_err:%s:%s', seed_name, err)
         elif ids is not None:
