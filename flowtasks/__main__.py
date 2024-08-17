@@ -6,11 +6,11 @@ import threading
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 
-from sqlalchemy import JSON
 from sqlalchemy import MetaData, Table, Column, String, create_engine
 from sqlalchemy import text
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.dialects.postgresql import JSONB
 
 from .utils import exe_func
 
@@ -59,7 +59,7 @@ if __name__ == '__main__':
             if len(diff_columns) > 0:
                 db = Session()
                 for t in diff_columns:
-                    table.append_column(Column(t, JSON))
+                    table.append_column(Column(t, JSONB))
                     if t.endswith('_err'):
                         db.execute(text(f"alter table {project_name} add {t} varchar"))
                     else:
@@ -70,7 +70,7 @@ if __name__ == '__main__':
             table = Table(project_name, metadata)
             table.append_column(Column('id', String, primary_key=True, comment='业务唯一ID'))
             for t in tasks:
-                table.append_column(Column(t['id'], JSON))
+                table.append_column(Column(t['id'], JSONB))
                 table.append_column(Column(t['id'] + '_err', String))
             metadata.create_all(_engine)
 
@@ -138,7 +138,7 @@ if __name__ == '__main__':
             if result is None:
                 result = {}
             db.execute(text(f"update {project_name} set {task_name} = :data where id = '{row_id}'"), {
-                'data': json.dumps(result)
+                'data': json.dumps(result, ensure_ascii=False)
             })
             row_dict[task_name] = result
             logging.info('task_done:%s:%s', task_name, row_id)
@@ -182,6 +182,8 @@ if __name__ == '__main__':
 
     # 运行一个种子任务
     def run_seed(seed):
+        if seed.get('skip'):
+          return
         seed_name = seed['id']
         logging.info('run_seed:%s', seed_name)
         try:
